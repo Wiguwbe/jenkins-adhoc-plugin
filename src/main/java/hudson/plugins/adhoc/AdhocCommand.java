@@ -1,16 +1,19 @@
 package hudson.plugins.adhoc;
 
-import groovy.lang.Binding;
-import groovy.lang.GroovyShell;
 import hudson.Extension;
 import hudson.cli.CLICommand;
+import hudson.model.Result;
+import hudson.model.queue.QueueTaskFuture;
 import jenkins.model.Jenkins;
 
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
+import java.io.InputStream;
 import java.nio.charset.Charset;
 import org.apache.commons.io.IOUtils;
-import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.GroovySandbox;
+
+import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
+import org.jenkinsci.plugins.workflow.job.WorkflowRun;
+
 import org.kohsuke.args4j.Argument;
 
 @Extension
@@ -28,22 +31,32 @@ public class AdhocCommand extends CLICommand {
     protected int run() throws Exception {
         // TODO jenkins.get().checkpermission?
 
-        this.stdout.println("Hello " + this.name);
-
         String script = IOUtils.toString(stdin, Charset.defaultCharset());
 
-        Binding binding = new Binding();
-        PrintWriter outPW = new PrintWriter(new OutputStreamWriter(stdout, getClientCharset()), true);
-        binding.setProperty("out", outPW);
-        binding.setProperty("stdin", stdin);
-        binding.setProperty("stdout", stdout);
-        binding.setProperty("stderr", stderr);
+        WorkflowJob job = new WorkflowJob(Jenkins.get(), "temp-job");
+        job.setDefinition(new CpsFlowDefinition(script, true));
 
-        GroovyShell shell = new GroovyShell(Jenkins.get().getPluginManager().uberClassLoader, binding);
-        GroovySandbox sandbox = new GroovySandbox();
-        sandbox.runScript(shell, script);
+        QueueTaskFuture<WorkflowRun> qtf = job.scheduleBuild2(0);
+        if (qtf == null) {
+            this.stderr.println("Failed to schedule");
+            return 1;
+        }
+        WorkflowRun run = qtf.waitForStart();
+        run.writeWholeLogTo(stdout);
+        stdout.flush();
 
-        outPW.flush();
+        Result result = run.getResult();
+        if (result == null) {
+            this.stderr.println("Result is null (build ongoing?)");
+            return 1;
+        }
+        if (result.isCompleteBuild()) {
+            this.stdout.println("Success");
+        } else {
+            this.stdout.println("error: " + result);
+        }
+
+        job.delete();
 
         return 0;
     }

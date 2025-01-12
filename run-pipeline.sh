@@ -17,10 +17,10 @@ out_real=$(realpath ${outdir})
 test "$pwd_real" != "$out_real" && rm -rf $outdir
 mkdir -p $outdir
 
-tar -C $workspace -c . | \
-    java -jar jenkins-cli.jar \
+tar -C $workspace -c --exclude-vcs-ignores --exclude-vcs . \
+| java -jar jenkins-cli.jar \
     -s http://localhost:8080/jenkins/ \
     adhoc \
         -jenkinsfile test.jenkins \
-        -uid $(id -u) -gid $(id -g) | \
-        tar -C $outdir -x
+        -uid $(id -u) -gid $(id -g) \
+        | tar -C $outdir -x

@@ -15,6 +15,6 @@ work
 .project
 
 *.jar
-out/
+out
 .vscode
 .devcontainer

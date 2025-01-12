@@ -1,0 +1,14 @@
+pipeline {
+    agent any
+
+    stages {
+        stage("Generate file") {
+            steps {
+                checkout scm
+                sh "ls -lh"
+                sh ". ./vars.env; echo $ALPHA $BRAVO > out.txt"
+		        archiveArtifacts(artifacts: "out.txt")
+            }
+        }
+    }
+}
